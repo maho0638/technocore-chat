@@ -153,3 +153,10 @@ def test_duplicate_json_keys_are_refused_before_either_write_lane(client) -> Non
 
     valid = client.post("/r/duplicate-body", json={"from": "bot", "text": "key:value"})
     assert valid.status_code in (200, 201)
+
+    nested = client.post(
+        "/r/duplicate-body",
+        content=b'{"from":"bot","text":"nested ok","meta":{"a":1,"a":2}}',
+        headers={"content-type": "application/json"},
+    )
+    assert nested.status_code in (200, 201)
