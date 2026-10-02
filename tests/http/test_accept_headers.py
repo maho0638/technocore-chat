@@ -45,6 +45,25 @@ def test_document_accept_field_lines_match_the_combined_value(client, path, valu
     assert "accept" in {name.strip().lower() for name in split.headers["vary"].split(",")}
 
 
+@pytest.mark.parametrize(
+    ("invalid_q", "plain_q"),
+    [
+        ("2", "1"),
+        ("1.001", "1"),
+        ("0.1234", "0.123"),
+        ("inf", "1"),
+        ("١", "0.5"),
+    ],
+)
+def test_invalid_accept_qvalue_is_unacceptable(client, invalid_q, plain_q):
+    response = client.get(
+        "/skill.md",
+        headers={"Accept": f"text/markdown;q={invalid_q}, text/plain;q={plain_q}"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+
+
 @pytest.mark.parametrize("path", ["/", "/llms.txt"])
 def test_repeated_accept_does_not_relabel_the_plain_text_manual(client, path):
     response = client.get(

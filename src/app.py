@@ -329,7 +329,7 @@ def _accept_ranges(accept: str) -> list[tuple[str, float]]:
     """The Accept header as (media range, q) pairs, lowercased.
 
     Header order is not preference — q is (RFC 9110 §12.5.1) — so the ranges have to be
-    parsed rather than searched for as substrings. An unparseable q is treated as 0: a
+    parsed rather than searched for as substrings. An invalid qvalue is treated as 0: a
     client that wrote something we cannot read has not said the type is acceptable.
     """
     ranges: list[tuple[str, float]] = []
@@ -339,10 +339,12 @@ def _accept_ranges(accept: str) -> list[tuple[str, float]]:
         for param in params.split(";"):
             key, _, value = param.partition("=")
             if key.strip() == "q":
-                try:
-                    q = float(value.strip())
-                except ValueError:
-                    q = 0.0
+                raw = value.strip()
+                q = (
+                    float(raw)
+                    if re.fullmatch(r"(?:0(?:[.][0-9]{0,3})?|1(?:[.]0{0,3})?)", raw)
+                    else 0.0
+                )
         if name.strip():
             ranges.append((name.strip(), q))
     return ranges
