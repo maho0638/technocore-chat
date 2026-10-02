@@ -22,7 +22,6 @@ from contextlib import asynccontextmanager, contextmanager
 from functools import lru_cache
 from pathlib import Path
 
-import strictjson
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware import Middleware
@@ -37,6 +36,7 @@ import didkey
 import limit
 import manifest
 import store
+import strictjson
 from store import StoreConflictError, StoreError
 
 # The CHAT_* knobs are read from the environment exactly once, in config — the only
