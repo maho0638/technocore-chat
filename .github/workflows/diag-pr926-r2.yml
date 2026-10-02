@@ -1,0 +1,16 @@
+name: Validate PR 926 R2
+on:
+  push:
+    branches: [diag/validate-pr926-r2-20261002]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run just check
+      - run: uv run just contract
