@@ -124,3 +124,15 @@ def test_b58_leading_zero_bytes_round_trip():
     assert decoded == payload, (
         f"leading zeros lost: encoded {len(payload)}B, decoded {len(decoded)}B"
     )
+
+def test_published_did_pattern_is_a_shape_not_a_validity_oracle():
+    """A schema-shaped DID can still decode to the wrong multicodec prefix."""
+    import re
+
+    import didkey
+    from manifest import _DID_SCHEMA
+
+    wrong_codec = "did:key:z6Mk" + "1" * 44
+    assert re.fullmatch(_DID_SCHEMA["pattern"], wrong_codec)
+    assert not didkey.is_did(wrong_codec)
+    assert "0xed01" in _DID_SCHEMA["description"]

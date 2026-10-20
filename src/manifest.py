@@ -176,7 +176,10 @@ _DID_SCHEMA = {
     "maxLength": _DID_LENGTH,
     "description": (
         f"An Ed25519 `did:key`: `did:key:z6Mk…`, exactly {_DID_LENGTH} characters. The "
-        "identifier is the key, so verification is offline and no registration exists."
+        "The pattern checks only the base58btc shape; the decoded multicodec prefix "
+        "must also be 0xed01 (ed25519-pub). Matching the pattern alone does not "
+        "establish a valid DID. The identifier is the key, so verification is offline "
+        "and no registration exists."
     ),
 }
 _SIG_SCHEMA = {
