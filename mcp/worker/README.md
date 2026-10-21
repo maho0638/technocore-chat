@@ -56,7 +56,7 @@ as `--no-build` but has no binary distribution ``. Re-run it after every change 
 
 **And rebuilding the wheel is not enough on its own.** pywrangler vendors the resolved set
 into `mcp/worker/python_modules/`, and it decides what to install from the wheel's *name*.
-A rebuild during development produces the same name — `technocore_mcp-0.14.0-py3-none-any.whl`
+A rebuild during development produces the same name — `technocore_mcp-0.14.5-py3-none-any.whl`
 — so the vendored copy is considered current and your change is silently left out of the
 bundle. Nothing fails; you deploy, the Worker runs, and it runs the old code. Clear the
 vendor directory whenever you change `mcp/src` without bumping the version:
@@ -103,7 +103,7 @@ something else. Delete it and you get the `workers.dev` URL above, or point it a
 you do hold.
 
 To serve a published release rather than this checkout, drop the `find-links` line from
-`[tool.uv]` in `pyproject.toml`. The dependency is an exact `technocore-mcp==0.14.0`, so with
+`[tool.uv]` in `pyproject.toml`. The dependency is an exact `technocore-mcp==0.14.5`, so with
 nothing pointing at `mcp/dist` the resolve takes that wheel from PyPI instead — and
 `uv build` stops being a prerequisite, because there is no local wheel in the picture.
 
@@ -120,10 +120,10 @@ pydantic ≥ 2.12, and pydantic-core is a Rust extension with no pure-Python fal
 the resolve fails outright rather than degrading. The 3.14 lane resolves against Pyodide
 314, which carries pydantic 2.12.
 
-**It is unauthenticated, and that is deliberate.** The service it fronts is public,
-unauthenticated and world-writable — every operation is a plain `GET` anyone can make —
-so an OAuth layer here would guard a door with no wall beside it. Deploy it and you have
-published an anonymous proxy to something already anonymous. Rate limiting and abuse
+**It is unauthenticated, and that is deliberate.** The origin is public and
+world-writable: it exposes anonymous `GET` write lanes, while this MCP wrapper uses
+`GET` for reads and `POST` for writes. Neither requires OAuth at the origin, so an
+OAuth layer here would guard a door with no wall beside it. Rate limiting and abuse
 handling stay the origin's job, where they already are.
 
 **Configuration comes from the binding, not the environment.** A Worker has no process
@@ -161,13 +161,15 @@ Without the key, no token is needed and the endpoint stays the anonymous proxy i
 **DNS-rebinding protection is off**, because there is nothing for it to protect and
 leaving it on would break the deployment: the SDK's default allows only localhost `Host`
 headers, so every request to a Workers subdomain would answer `421 Misdirected Request`.
-See `REMOTE_SECURITY` in `mcp/src/technocore_mcp/server.py`.
+See `REMOTE_SECURITY` in `mcp/src/technocore_mcp/server.py`. `technocore-mcp --http` on
+loopback is the opposite case — the user's browser can reach it — and uses
+`LOCAL_SECURITY`, which requires a loopback `Host` and `Origin`.
 
-**Stateless, and there is no state to lose.** Every tool call is one independent GET
-against the origin, so the endpoint runs in the SDK's stateless mode: no session id, no
-event store, no resumable stream. That is also what makes it correct on an edge runtime,
-where consecutive requests may land in different isolates. SSE is deprecated and is not
-served.
+**Stateless, and there is no state to lose.** Network reads use `GET` and writes use
+`POST`; `whoami` is local, while `read_docs` may fetch multiple documents. None of
+these calls depends on a previous session, so the SDK runs in stateless mode: no
+session id, no event store, no resumable stream. Consecutive requests may land in
+different edge isolates. SSE is deprecated and is not served.
 
 **It is slow on a cold isolate, and that is inherent.** The bundle is 884 modules and
 18.7 MB (5.1 MB gzipped), essentially all of it the MCP SDK and its dependency tree, and an
