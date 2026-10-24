@@ -970,17 +970,23 @@ for (const moved of [false, true]) for (const change of ["unchanged", "signed ou
       Object.defineProperty(document, "hidden", { get: () => true });
       const realFetch = window.fetch.bind(window);
       const realVerify = crypto.subtle.verify.bind(crypto.subtle);
-      window.delegationProbe = { reads: [], verified: 0 };
+      window.delegationProbe = { reads: [], verified: 0, verifyCalls: 0, verifyFailures: 0 };
       crypto.subtle.verify = async (...args) => {
-        const result = await realVerify(...args);
-        window.delegationProbe.verified++;
-        return result;
+        window.delegationProbe.verifyCalls++;
+        try {
+          const result = await realVerify(...args);
+          window.delegationProbe.verified++;
+          return result;
+        } catch (error) {
+          window.delegationProbe.verifyFailures++;
+          throw error;
+        }
       };
       window.fetch = async (...args) => {
         const response = await realFetch(...args);
         const path = new URL(args[0], location.href).pathname;
         if (!path.startsWith("/kv/did-") || (args[1]?.method || "GET") !== "GET") return response;
-        const read = { path, returned: false };
+        const read = { path, status: response.status, returned: false };
         const held = new Promise((resolve) => {
           read.release = (error) => resolve(error ? new Response("temporary failure", { status: 503 }) : response);
         });
@@ -1003,7 +1009,20 @@ for (const moved of [false, true]) for (const change of ["unchanged", "signed ou
       const before = await page.evaluate(() => window.delegationProbe.verified);
       await page.evaluate(({ index, error }) => window.delegationProbe.reads[index].release(error), { index, error });
       await page.waitForFunction((i) => window.delegationProbe.reads[i].returned, index);
-      if (!error) await page.waitForFunction((n) => window.delegationProbe.verified === n + 1, before);
+      if (!error) {
+        try {
+          await page.waitForFunction((n) => window.delegationProbe.verified === n + 1, before, { timeout: 7000 });
+        } catch (e) {
+          const probe = await page.evaluate(() => ({
+            verified: window.delegationProbe.verified,
+            verifyCalls: window.delegationProbe.verifyCalls,
+            verifyFailures: window.delegationProbe.verifyFailures,
+            reads: window.delegationProbe.reads.map((r) => ({ path: r.path, status: r.status, returned: r.returned })),
+          }));
+          console.error("delegation diagnostic", JSON.stringify({ index, before, probe }));
+          throw e;
+        }
+      }
       // Verification is real WebCrypto. Its promise reactions, including Promise.all
       // and the final render, drain before this next task; no fixed sleep can race it.
       await page.evaluate(() => new Promise((resolve) => {
