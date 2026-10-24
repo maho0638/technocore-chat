@@ -32,7 +32,7 @@ name: humans page
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, ci/validate-humans-1029-head-20261024]
     paths:
       - "src/humans.html"
       - "src/app.py"
