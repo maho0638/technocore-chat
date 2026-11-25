@@ -1,0 +1,38 @@
+name: Validate rooms benchmark writer failure 1129
+on:
+  push:
+    branches: ['qa/rooms-writer-failure-1129']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Prove the regression fails on the unmodified upstream source
+        run: |
+          cp bench/rooms.py "$RUNNER_TEMP/rooms-fixed.py"
+          git show 3cd868e9a920fe61ad318d71ced1af11501b8fae:bench/rooms.py > bench/rooms.py
+          set +e
+          uv run python -m pytest tests/unit/test_rooms_bench_writer_failure.py -q > "$RUNNER_TEMP/base.txt" 2>&1
+          result=$?
+          set -e
+          cp "$RUNNER_TEMP/rooms-fixed.py" bench/rooms.py
+          cat "$RUNNER_TEMP/base.txt"
+          test "$result" = 1
+          grep -F '2 failed, 1 passed' "$RUNNER_TEMP/base.txt"
+          grep -F 'DID NOT RAISE' "$RUNNER_TEMP/base.txt"
+      - name: Verify fixed source
+        run: uv run python -m pytest tests/unit/test_rooms_bench_writer_failure.py -q
+      - name: Full repository checks
+        run: uv run just check
+      - run: git diff --exit-code
