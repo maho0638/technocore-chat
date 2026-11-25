@@ -130,10 +130,17 @@ def contended(root: Path, limit: int, reps: int, writers: int, deep: int) -> dic
     wait.
     """
     stop = threading.Event()
+    failures: list[BaseException] = []
+    guard = threading.Lock()
 
     def churn(k: int) -> None:
-        while not stop.is_set():
-            store._write_record(root, f"bench-d{k:06d}", "w", "churn")
+        try:
+            while not stop.is_set():
+                store._write_record(root, f"bench-d{k:06d}", "w", "churn")
+        except BaseException as exc:
+            with guard:
+                failures.append(exc)
+            stop.set()
 
     threads = [
         threading.Thread(target=churn, args=(i,), daemon=True)
@@ -142,11 +149,15 @@ def contended(root: Path, limit: int, reps: int, writers: int, deep: int) -> dic
     for t in threads:
         t.start()
     try:
-        return arm(root, limit, True, reps)
+        result = arm(root, limit, True, reps)
     finally:
         stop.set()
+        # Finish every writer before the temporary store can be removed.
         for t in threads:
-            t.join(timeout=5)
+            t.join()
+    if failures:
+        raise RuntimeError("contended room writer failed") from failures[0]
+    return result
 
 
 @dataclasses.dataclass
